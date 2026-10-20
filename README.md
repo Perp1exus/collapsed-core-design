@@ -1,35 +1,240 @@
-# collapsed core design
-
 collapsed core design
 
-I build a collapsed core design in the sandbox that supports redundancy via 
-hsrp and spanning-tree, with build in server sending outbound traffic to an 
+===
 
-router acting an isp routing back to the source ip. For security purposes
+I built a collapsed core topology in the Sandbox implementing the following:
 
-I also added floating static route for acting as a backup route to the isp if 
 
-there is downtime. For easy ip addressing I just enabled DHCP to avoid configuring 
-client PC one by one.
 
-I started configuring vlans first made sure that everything is setup, spanning-tree, trunking, native vlan and access switches, turned off all unusd ports and assigned it to a respected access vlan once it was all settled I configured hrvp ip. While I'm configuring hsrvp I also configured vlan priorities along with it basically for active router enabled preemption they have vlan priorities at 0 hsrp at 110 and for standby priority at 4096 and hsrp at default number. I also put etherchannel for much better failover coverage.
+* Trunking, native, access and switch vlan interface
+* DHCP
+* DNS
+* EtherChannel
+* Spanning-tree priority
+* HSRP
+* Floating static routing
+* SSH
+* OSPF
+* Access-list
 
-Once I was done configuring I moved on configuring OSPF to dynamically allocate
 
-neighboring routes. In the main-router i set point-to-point ospf routing 
 
-and to avoid dbr election I made both connecting ports to core1 and core 2
-to highest priority leaving portchannel 1 as 2-way. 
+I started laying out the topology first put PCs for each departments and access switches. Upon
 
-The isp part was the challenging one for me since I have to think how can server
+arranging the topology I found out that there is no IP phone as included in the devices option
 
-act like it's actually connected to an internet while having dns service enabled on. What I did was I set it up as loopback address representing dns that are configured on the server end. This allowed traffic to recognize the name along with its built in IP address.
+so I made this lab a little simpler from the access switch side. There is also one server to
 
-Lastly, I configured all network devices except to the isp to allow ssh transport traffic only for the IPs of IT team for added layer of security.
+to setup a DNS service later on this lab.
+
+When I was done with the first layer of the architecture I moved on setting up core switches. In
+
+This part I connected each network devices including the main-router and isp leaving me a partial
+
+mesh design as I finish my topology. After this I put all switches into rapid-pvst+ for faster
+
+service.
+
+I assigned IP to the SVI including their standby IP, set core switches to be active on hsrp
+
+taking vlan priority 0 and vice versa. I also included a management vlan for access switches
+
+since I will setup ssh remote access later.
+
+Here are their classifications:
+
+vlan 10 IT
+
+192.168.10.0/24
+
+vip: 192.168.10.1
+
+core 1: 192.168.10.2
+
+core 2: 192.168.10.3
+
+
+
+vlan 20 HR
+
+192.168.20.0/24
+
+vip: 192.168.20.1
+
+core 1: 192.168.20.2
+
+core 2: 192.168.20.3
+
+
+
+
+
+vlan 30 STAFF
+
+192.168.30.0/24
+
+vip: 192.168.30.1
+
+core 1: 192.168.30.2
+
+core 2: 192.168.30.3
+
+
+
+
+
+vlan 40 SERVER
+
+192.168.40.0/24
+
+vip: 192.168.40.1
+
+core 1: 192.168.40.2
+
+core 2:192.168.40.3
+
+
+
+
+
+management vlan 99
+
+192.168.50.0/24
+
+vip: sw1: 192.168.50.1
+
+core1: 192.168.50.2
+
+core2:192.168.50.3
+
+sw1: 192.168.50.10
+
+sw2: 192.168.50.20
+
+sw3: 192.168.50.30
+
+sw4: 192.168.50.40
+
+core1:
+
+active 110 \& vlan prio 0:
+
+
+
+preempt
+
+vlan99 5
+
+vlan10 1
+
+vlan20 2
+
+standby vlan prio 4096:
+
+vlan30 3
+
+vlan40 4
+
+
+
+core2
+
+active 110 \& vlan prio 0:
+
+
+
+preempt
+
+vlan30 3
+
+vlan40 4
+
+standby vlan prio 4096:
+
+vlan99 5
+
+vlan10 1
+
+vlan20 2
+
+Once I was done with all the setup I mentioned above. I proceed on putting IP on interfaces
+mainly core switches and main router. I need to ensure that all network devices connects or
+
+communicates with each other before configuring main-router to isp connections. Included
+loopback addresses. I added OSPF connection routes with this putting all vlan to passive-
+
+interfaces but include their ip on the network configs. Set main-router connections to
+
+core switches as point-to-point and give it as the highest priority to set it as a
+
+default designated router, leaving the connected layer 3 Ethechannel to be in a 2 way form.
+
+Here are their classifications:
+
+main-router
+
+loopback0:
+
+192.168.255.255
+
+
+
+core 1
+
+loopback0:
+
+192.168.254.254
+
+
+
+core 2
+
+loopback0:
+
+192.168.253.253
+
+main-router - core1
+
+192.168.60.0/30
+
+
+
+main-router - core2
+
+192.168.61.0/30
+
+
+
+core1-core2
+
+192.168.62.0/30
+
+
+
+Upon checking that all devices are able to ping with each other I enabled the DNS service on
+
+in the server. I initiate a default-information originate to the 2 connection on the isp leaving
+
+one interface as floating static to ensure redundancy. It took me a long time to figure this
+
+out since the route for both networks main-router to isp is 0.0.0.0 0.0.0.0 (next-hop) when
+
+I ping from the PC it translates the name to an IP but TTL expires using traceroute I noticed
+
+that the packet is bouncing into one another allowing me not to receive the packet.
+What I did was configure loopback addresses of what are inside the server. This solved the
+
+problem and enabled my topology to somehow translates a real life connection of networks.
+
+Lastly, I configured the ssh, login local, secret into all network devices except for the
+
+isp. This can only be access by the IT department and no one else.
+
+Here are the running commands of each devices:
 
 These are the running configs from each of my network devices:
 
-SW1 
+SW1
 SW1#sh run
 
 Building configuration...
@@ -915,6 +1120,7 @@ end
 SW3
 
 
+
 SW3#sh run
 
 Building configuration...
@@ -1356,6 +1562,7 @@ line vty 0 15
 end
 
 SW4
+
 
 
 SW4#sh run
@@ -2325,6 +2532,7 @@ end
 core1
 
 
+
 core1#sh run
 
 Building configuration...
@@ -2919,9 +3127,9 @@ ip dhcp pool vlan10
 
 &#x20;network 192.168.10.0 255.255.255.0
 
-&#x20;default-router 192.168.10.1 
+&#x20;default-router 192.168.10.1
 
-&#x20;dns-server 192.168.40.4 
+&#x20;dns-server 192.168.40.4
 
 &#x20;domain-name mydomain.com
 
@@ -2929,9 +3137,9 @@ ip dhcp pool vlan20
 
 &#x20;network 192.168.20.0 255.255.255.0
 
-&#x20;default-router 192.168.20.1 
+&#x20;default-router 192.168.20.1
 
-&#x20;dns-server 192.168.40.4 
+&#x20;dns-server 192.168.40.4
 
 &#x20;domain-name mydomain.com
 
@@ -2939,9 +3147,9 @@ ip dhcp pool vlan30
 
 &#x20;network 192.168.30.0 255.255.255.0
 
-&#x20;default-router 192.168.30.1 
+&#x20;default-router 192.168.30.1
 
-&#x20;dns-server 192.168.40.4 
+&#x20;dns-server 192.168.40.4
 
 &#x20;domain-name mydomain.com
 
@@ -2949,9 +3157,9 @@ ip dhcp pool vlan99
 
 &#x20;network 192.168.50.0 255.255.255.0
 
-&#x20;default-router 192.168.50.1 
+&#x20;default-router 192.168.50.1
 
-&#x20;dns-server 192.168.40.4 
+&#x20;dns-server 192.168.40.4
 
 &#x20;domain-name mydomain.com
 
@@ -3450,5 +3658,6 @@ no scheduler allocate
 !
 
 end
+
 
 
